@@ -16,6 +16,10 @@ export const resMessage = {
   successResetPassword: "reset password successfully",
   successVerifyPassword: "password is correct",
   successChangePassword: "change password successfully",
+  successAddBook: "new book created successfully",
+  successUpdateBook: "update this book successfully",
+  successBorrowBook: "borrow book successfully",
+  successReturnBook: "return book successfully",
 
   internalServer: "our server encountered error, please try again later",
   requireRole: "role is required",
@@ -27,7 +31,6 @@ export const resMessage = {
   invalidRole: "this email is not registered with this role",
   invalidToken: "token is invalid",
   wrongPassword: "password is incorrect",
-  noGoogleCode: "authorization code is not available",
   emailFailed: "failed to send email",
   noRefreshToken: "refresh token is not available",
   noAccessToken: "access token is not available",
@@ -41,6 +44,17 @@ export const resMessage = {
     'the only accepted value for restriction method are "GET", "POST", "PUT", "PATCH", or "DELETE"',
   maxMemberCodeExceeded: "maximum member code is exceeded",
   restrictedRole: "this email cannot be registered as this role",
+  pageIsNaturalNumber: "page value must be an integer and greater than zero",
+  bookIsExist: "book title with this author already exist",
+  bookCodeIsUsed: "this book code has been used",
+  stockIsWholeNumber: "stock value must be a positive integer",
+  bookIsNotFound: "there is a book that has not been registered",
+  bookIsOutOfStock: "there is a book that out of stock",
+  tooManyBorrow: "each user cannot borrows more than 2 books",
+  tooFewBorrow: "minimum book borrowing is 1 unit",
+  penalizedUser: "this account cannot borrow a book due the penalty",
+  hasBeenBorrow: "user cannot borrow the book that is being borrowed",
+  hasNotBeenBorrow: "user cannot return books that has not been borrowed",
 };
 
 export const resCode = {

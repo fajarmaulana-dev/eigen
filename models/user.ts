@@ -8,7 +8,6 @@ export type TUser = {
   email: string;
   verify_email_token: string | null;
   roles: TUserRole[];
-  borrowed_books?: string[];
   created_at?: Date;
   updated_at?: Date;
   deleted_at?: Date | null;
@@ -19,7 +18,6 @@ const userSchema = new Schema<TUser>({
   code: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   verify_email_token: String,
-  borrowed_books: [String],
   roles: [{ name: String, additions: { type: Map, of: Schema.Types.Mixed } }],
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },

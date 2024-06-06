@@ -26,7 +26,10 @@ export class Authenticator {
       if (!user) return next(appError.forbidden(resMessage.invalidToken));
 
       if (user.role !== cRole.admin) {
-        const route = await this.routeRepository.findOneByName(req.originalUrl);
+        let path = req.originalUrl;
+        const searchIndex = path.indexOf("?");
+        if (searchIndex !== -1) path = path.slice(0, searchIndex);
+        const route = await this.routeRepository.findOneByName(path);
         if (!route) return next(appError.notFound(resMessage.serverRouteIsNotFound));
         const restriction = route.restrictions.find((r) => r.method == req.method);
         if (restriction && !restriction.roles.includes(user.role))

@@ -1,13 +1,14 @@
 import { TConfig } from "../utils/config";
 import { set, connect, connection } from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
+import { cEnv } from "../constants/env";
 
 let mongo: MongoMemoryServer | null = null;
 export const connectDB = async (config: TConfig) => {
   set("strictQuery", false);
   try {
     let dbUrl = config.dbUrl;
-    if (config.env === "test") {
+    if (config.env === cEnv.test) {
       mongo = await MongoMemoryServer.create();
       dbUrl = mongo.getUri();
     }

@@ -15,7 +15,7 @@ export class Validator {
   private email: (name?: string) => ValidationChain[];
   private required: (name: string) => ValidationChain;
   private mustFilled: (name: string) => ValidationChain;
-  private isList: (name: string) => ValidationChain;
+  private isList: (name: string, param?: { min?: number; max?: number }) => ValidationChain;
   private isIn: (name: string, items: string[]) => ValidationChain;
   private isStr: (name: string) => ValidationChain;
   private isBool: (name: string) => ValidationChain;
@@ -35,7 +35,9 @@ export class Validator {
     this.isInt = (name) => check(name, `${name.replace(/(.*)\./g, "")} must be a integer`).isInt();
     this.required = (name) => check(name, `${name.replace(/(.*)\./g, "")} is required`).exists();
     this.mustFilled = (name) =>
-      check(name, `${name.replace(/(.*)\./g, "")} cannot be empty`).notEmpty();
+      check(name, `${name.replace(/(.*)\./g, "")} must be a non empty string`)
+        .isString()
+        .notEmpty();
     this.isIn = (name, items) => {
       let strItems = "";
       items.forEach((i, idx) =>
@@ -47,8 +49,12 @@ export class Validator {
       );
       return check(name, `${name.replace(/(.*)\./g, "")} value is either ${strItems}`).isIn(items);
     };
-    this.isList = (name) =>
-      check(name, `${name.replace(/(.*)\./g, "")} must be an array`).isArray();
+    this.isList = (name, param) => {
+      let message = `${name.replace(/(.*)\./g, "")} must be an array`;
+      if (param && param?.min) message = message + ` with minimum ${param.min} item`;
+      if (param && param?.max) message = message + ` with maximum ${param.max} item`;
+      return check(name, message).isArray(param);
+    };
     this.password = (name = "password") => [
       this.required(name),
       check(name, "password cannot be empty").notEmpty(),
@@ -127,6 +133,12 @@ export class Validator {
           case "isBoolean":
             rule.isBoolean();
             break;
+          case "isNull":
+            rule.custom((value) => {
+              if (value !== null) throw new Error(ve.message);
+              return true;
+            });
+            break;
           case "notEmpty":
             rule.notEmpty();
             break;
@@ -137,6 +149,12 @@ export class Validator {
           case "isIn":
             const arr = JSON.parse(ve.validator);
             rule.isIn(arr);
+            break;
+          case "isArray":
+            if (ve.validator) {
+              const param = JSON.parse(ve.validator.replace(/\\/g, ""));
+              rule.isArray(param);
+            } else rule.isArray();
             break;
         }
         rule.withMessage(ve.message);
@@ -209,7 +227,15 @@ export class Validator {
   };
 
   role = async (req: Request, res: Response, next: NextFunction) => {
-    const validationMethods = ["exists", "isString", "isBoolean", "notEmpty", "match", "isIn"];
+    const validationMethods = [
+      "exists",
+      "isString",
+      "isBoolean",
+      "notEmpty",
+      "match",
+      "isIn",
+      "isArray",
+    ];
     const rules = [
       this.required("name"),
       this.mustFilled("name"),
@@ -247,6 +273,27 @@ export class Validator {
       this.isList("restrictions.*.roles"),
       this.isOpt("restrictions.*.roles.*").isString().withMessage("roles items must be a string"),
     ];
+    const validator = this.validate(rules);
+    validator(req, res, next);
+  };
+
+  book = async (req: Request, res: Response, next: NextFunction) => {
+    const rules = [
+      this.required("title"),
+      this.mustFilled("title"),
+      this.required("author"),
+      this.mustFilled("author"),
+      this.required("code"),
+      this.mustFilled("code"),
+      this.required("stock"),
+      this.isInt("stock"),
+    ];
+    const validator = this.validate(rules);
+    validator(req, res, next);
+  };
+
+  bookRecord = async (req: Request, res: Response, next: NextFunction) => {
+    const rules = [this.isList("book_codes", { min: 1 }), this.mustFilled("book_codes.*")];
     const validator = this.validate(rules);
     validator(req, res, next);
   };

@@ -12,10 +12,14 @@ import { Request } from "../types/express";
 import { resCode, resMessage } from "../constants/http-response";
 import { TConfig } from "../utils/config";
 import { TJwtPayloads } from "../utils/jwt-provider";
+import { cEnv } from "../constants/env";
+
+type ResRoleToken = { max_date: string; role: string; token?: string };
 
 export class AuthHandler {
   private accessCookie: CookieOptions;
   private refreshCookie: CookieOptions;
+  private env: string;
 
   constructor(private authService: IAuthService, config: TConfig) {
     this.authService = authService;
@@ -23,19 +27,25 @@ export class AuthHandler {
       expires: new Date(Date.now() + config.accessExp),
       maxAge: config.accessExp,
       httpOnly: true,
-      sameSite: config.env === "release" ? "none" : "lax",
-      secure: config.env === "release",
+      sameSite: config.env === cEnv.release ? "none" : "lax",
+      secure: config.env === cEnv.release,
     };
     this.refreshCookie = { ...this.accessCookie };
     this.refreshCookie.expires = new Date(Date.now() + config.refreshExp);
     this.refreshCookie.maxAge = config.refreshExp;
+    this.env = config.env;
   }
 
   register = async (req: Request<TRegisterRequest>, res: Response, next: NextFunction) => {
     try {
       const token = await this.authService.register(req.body);
       const message = token ? resMessage.successRegister : resMessage.successRegisterNewRole;
-      res.status(resCode.Created).json({ message });
+      const code = token ? resCode.Created : resCode.OK;
+      if (token && this.env !== cEnv.release) {
+        res.status(code).json({ message, data: { token } });
+        return;
+      }
+      res.status(code).json({ message });
     } catch (error) {
       return next(error);
     }
@@ -57,11 +67,13 @@ export class AuthHandler {
   ) => {
     try {
       const { email, role } = req.body;
-      const max_date = await this.authService.resendMailToken(email);
-      res.status(resCode.OK).json({
+      const data = await this.authService.resendMailToken(email);
+      const response = {
         message: resMessage.successRegister,
-        data: { max_date, role },
-      });
+        data: { max_date: data.max_date, role } as ResRoleToken,
+      };
+      if (this.env !== cEnv.release) response.data.token = data.token;
+      res.status(resCode.OK).json(response);
     } catch (error) {
       return next(error);
     }
@@ -79,7 +91,7 @@ export class AuthHandler {
   };
 
   refreshToken = async (
-    req: Request<any, any, any, { refresh_token: string }>,
+    req: Request<any, any, any, { refresh_token: string | undefined }>,
     res: Response,
     next: NextFunction
   ) => {
@@ -128,11 +140,13 @@ export class AuthHandler {
     next: NextFunction
   ) => {
     try {
-      const max_date = await this.authService.mailForgotPassword(req.body);
-      res.status(resCode.OK).json({
-        message: resMessage.successSendResetPassAccess,
-        data: { max_date, role: req.body.role },
-      });
+      const data = await this.authService.mailForgotPassword(req.body);
+      const response = {
+        message: resMessage.successRegister,
+        data: { max_date: data.max_date, role: req.body.role } as ResRoleToken,
+      };
+      if (this.env !== cEnv.release) response.data.token = data.token;
+      res.status(resCode.OK).json(response);
     } catch (error) {
       return next(error);
     }

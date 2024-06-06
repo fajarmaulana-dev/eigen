@@ -2,6 +2,7 @@ import nodemailer from "nodemailer";
 import { TConfig } from "./config";
 import appError from "../errors/apperror";
 import { resMessage } from "../constants/http-response";
+import { cEnv } from "../constants/env";
 
 type TMailerParam = {
   email: string;
@@ -46,7 +47,7 @@ export class Mailer implements IMailer {
       });
 
       await transporter.sendMail({
-        from: `MyApp <${this.config.email}>`,
+        from: `${this.config.appName} <${this.config.email}>`,
         to: data.email,
         subject: data.subject,
         html: `
@@ -65,7 +66,7 @@ export class Mailer implements IMailer {
             `,
       });
 
-      console.log("Email has been sent");
+      if (this.config.env == cEnv.debug) console.log("Email has been sent");
     } catch (error) {
       throw appError.internalServer(new Error(resMessage.emailFailed), resMessage.emailFailed);
     }

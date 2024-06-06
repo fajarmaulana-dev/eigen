@@ -14,6 +14,12 @@ import { Validator } from "../middlewares/validator";
 import { Authenticator } from "../middlewares/authenticator";
 import { RouteRepository } from "../repositories/route";
 import route from "../models/route";
+import { UserHandler } from "../handlers/user";
+import { UserService } from "../services/user";
+import { BookHandler } from "../handlers/book";
+import { BookRepository } from "../repositories/book";
+import book from "../models/book";
+import { BookService } from "../services/book";
 
 export class Routes {
   config: TConfig;
@@ -31,6 +37,7 @@ export class Routes {
     const roleRepository = new RoleRepository(role);
     const routeRepository = new RouteRepository(route);
     const userRepository = new UserRepository(user, resetpasswordToken);
+    const bookRepository = new BookRepository(book);
 
     const authService = new AuthService(
       userRepository,
@@ -41,8 +48,12 @@ export class Routes {
       mailer,
       this.config
     );
+    const userService = new UserService(userRepository, bookRepository);
+    const bookService = new BookService(bookRepository);
 
     const authHandler = new AuthHandler(authService, this.config);
+    const userHandler = new UserHandler(userService);
+    const bookHandler = new BookHandler(bookService);
 
     const authenticator = new Authenticator(userRepository, routeRepository, jwtProvider);
     const ve = new Validator(roleRepository);
@@ -52,6 +63,8 @@ export class Routes {
       authenticator,
       ve,
       authHandler,
+      userHandler,
+      bookHandler,
     };
   }
 
@@ -76,6 +89,28 @@ export class Routes {
     r.router.post("/route", r.ve.route, r.authHandler.addRoute);
     r.router.patch("/route", r.ve.route, r.authHandler.updateRoute);
 
+    return r.router;
+  }
+
+  userRoute() {
+    const r = this.createRouter();
+
+    r.router.use(r.authenticator.verify);
+    r.router.get("/", r.userHandler.getAllUsers);
+    r.router.patch("/borrow-books", r.ve.bookRecord, r.userHandler.borrowBooks);
+    r.router.patch("/return-books", r.ve.bookRecord, r.userHandler.returnBooks);
+
+    return r.router;
+  }
+
+  bookRoute() {
+    const r = this.createRouter();
+
+    r.router.get("/", r.bookHandler.getAllBooks);
+
+    r.router.use(r.authenticator.verify);
+    r.router.post("/", r.ve.book, r.bookHandler.addBook);
+    r.router.patch("/", r.ve.book, r.bookHandler.updateBook);
     return r.router;
   }
 }

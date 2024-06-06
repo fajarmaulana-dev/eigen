@@ -1,14 +1,20 @@
+import { ClientSession } from "mongoose";
 import { TResetPasswordRequest } from "../dtos/auth";
 import { TResetPassword, TResetPasswordModel } from "../models/resetpassword-token";
 import { TUser, TUserModel, TUserRole } from "../models/user";
 
 export interface IUserRepository {
-  findOneByEmail: (email: string) => Promise<TUser | null>;
+  findOneByEmail: (email: string, session?: ClientSession) => Promise<TUser | null>;
   findOneByToken: (token: string) => Promise<TUser | null>;
   findLastOne: () => Promise<TUser | null>;
+  findAll: (
+    role: string,
+    page: number,
+    limit: number
+  ) => Promise<{ totalData: number; data: TUser[] }>;
   createOne: (user: TUser) => Promise<void>;
   updateMailToken: (email: string, token?: string) => Promise<void>;
-  updatePassword: (email: string, roles: TUserRole[]) => Promise<void>;
+  updateAdditions: (email: string, roles: TUserRole[], session?: ClientSession) => Promise<void>;
   findOneResetToken: (
     token: Omit<TResetPasswordRequest, "password">
   ) => Promise<TResetPassword | null>;
@@ -23,8 +29,9 @@ export class UserRepository implements IUserRepository {
     this.resetModel = resetModel;
   }
 
-  async findOneByEmail(email: string): Promise<TUser | null> {
+  async findOneByEmail(email: string, session?: ClientSession): Promise<TUser | null> {
     try {
+      if (session) return await this.userModel.findOne({ email }).session(session);
       return await this.userModel.findOne({ email });
     } catch (error) {
       throw error;
@@ -47,13 +54,30 @@ export class UserRepository implements IUserRepository {
     }
   }
 
+  async findAll(
+    role: string,
+    page: number,
+    limit: number
+  ): Promise<{ totalData: number; data: TUser[] }> {
+    const countQuery = this.userModel.countDocuments({ roles: { $elemMatch: { name: role } } });
+    const dataQuery = this.userModel
+      .find({ roles: { $elemMatch: { name: role } } })
+      .skip((page - 1) * limit)
+      .limit(limit);
+    try {
+      const [totalData, data] = await Promise.all([countQuery, dataQuery]);
+      return { totalData, data };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async createOne(user: TUser): Promise<void> {
     try {
       await this.userModel.findOneAndUpdate(
         { email: user.email },
         {
           code: user.code,
-          email: user.email,
           verify_email_token: user.verify_email_token,
           roles: user.roles,
           updated_at: new Date(),
@@ -84,14 +108,15 @@ export class UserRepository implements IUserRepository {
     }
   }
 
-  async updatePassword(email: string, roles: TUserRole[]): Promise<void> {
+  async updateAdditions(email: string, roles: TUserRole[], session?: ClientSession): Promise<void> {
     try {
       await this.userModel.updateOne(
         { email },
         {
           roles,
           updated_at: new Date(),
-        }
+        },
+        { session }
       );
     } catch (error) {
       throw error;

@@ -23,6 +23,8 @@ const init = async (config: TConfig | string) => {
   app.use(cookieParser());
 
   app.use("/auth", routes.authRoute());
+  app.use("/users", routes.userRoute());
+  app.use("/books", routes.bookRoute());
 
   app.get("/", (_, res) => {
     res.status(resCode.OK).json({ message: resMessage.OK });

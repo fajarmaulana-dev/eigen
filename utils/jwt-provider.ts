@@ -23,38 +23,26 @@ export class JwtProvider implements IJwtProvider {
   }
 
   private async createKey() {
-    try {
-      const keystore = JWK.createKeyStore();
-      const key = await keystore.add({
-        kty: "oct",
-        k: Buffer.from(this.config.secretKey).toString("base64"),
-      });
-      return key;
-    } catch (error) {
-      throw error;
-    }
+    const keystore = JWK.createKeyStore();
+    const key = await keystore.add({
+      kty: "oct",
+      k: Buffer.from(this.config.secretKey).toString("base64"),
+    });
+    return key;
   }
 
   private async encryptJwt(payloads: TJwtPayloads): Promise<string> {
-    try {
-      const key = await this.createKey();
-      const encrypted = await JWE.createEncrypt({ format: "compact" }, key)
-        .update(JSON.stringify(payloads))
-        .final();
-      return encrypted;
-    } catch (error) {
-      throw error;
-    }
+    const key = await this.createKey();
+    const encrypted = await JWE.createEncrypt({ format: "compact" }, key)
+      .update(JSON.stringify(payloads))
+      .final();
+    return encrypted;
   }
 
   private async decryptJwt(encryptedToken: string): Promise<TJwtPayloads> {
-    try {
-      const key = await this.createKey();
-      const decrypted = await JWE.createDecrypt(key).decrypt(encryptedToken);
-      return JSON.parse(decrypted.plaintext.toString());
-    } catch (error) {
-      throw error;
-    }
+    const key = await this.createKey();
+    const decrypted = await JWE.createDecrypt(key).decrypt(encryptedToken);
+    return JSON.parse(decrypted.plaintext.toString());
   }
 
   async sign(payloads: TJwtPayloads, refresh?: string): Promise<TJwt> {

@@ -1,5 +1,6 @@
 export const cRole = {
   admin: "admin",
+  user: "user",
   access: ["readonly", "noaccess"],
 };
 

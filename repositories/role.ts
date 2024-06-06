@@ -1,10 +1,9 @@
-import { ClientSession } from "mongoose";
 import { TRoleRequest } from "../dtos/auth";
 import { TRole, TRoleModel } from "../models/role";
 
 export interface IRoleRepository {
   updateOne: (role: TRoleRequest) => Promise<void>;
-  updateRegistration: (role: TRoleRequest, session?: ClientSession) => Promise<void>;
+  updateRegistration: (role: TRoleRequest) => Promise<void>;
   findOneByName: (name: string) => Promise<TRole | null>;
   deleteOne: (name: string) => Promise<void>;
 }
@@ -32,15 +31,14 @@ export class RoleRepository implements IRoleRepository {
     }
   }
 
-  async updateRegistration(role: TRoleRequest, session?: ClientSession): Promise<void> {
+  async updateRegistration(role: TRoleRequest): Promise<void> {
     try {
       await this.roleModel.updateOne(
         { name: role.name },
         {
           registration: role.registration,
           updated_at: new Date(),
-        },
-        { session }
+        }
       );
     } catch (error) {
       throw error;

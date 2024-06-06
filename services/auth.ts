@@ -23,15 +23,23 @@ import { TRoute } from "../models/route";
 import { TUser, TUserRole } from "../models/user";
 import { TConfig } from "../utils/config";
 
+export type TUserFilters = {
+  role: string;
+  page: string;
+  limit: string;
+};
+
 export interface IAuthService {
   register: (payloads: TRegisterRequest) => Promise<string | null>;
   verifyEmail: (token: string) => Promise<void>;
-  resendMailToken: (email: string) => Promise<string>;
+  resendMailToken: (email: string) => Promise<{ max_date: string; token: string }>;
   login: (payloads: TLoginRequest) => Promise<{ user: TLoginResponse; token: TJwt }>;
-  refreshToken: (refreshToken: string) => Promise<TJwt>;
+  refreshToken: (refreshToken: string | undefined) => Promise<TJwt>;
   verifyPassword: (payloads: TLoginRequest) => Promise<void>;
   changePassword: (payloads: TLoginRequest) => Promise<void>;
-  mailForgotPassword: (payloads: TForgotPasswordRequest) => Promise<string>;
+  mailForgotPassword: (
+    payloads: TForgotPasswordRequest
+  ) => Promise<{ max_date: string; token: string }>;
   resetPassword: (payloads: TResetPasswordRequest) => Promise<void>;
   addRole: (payloads: TRoleRequest) => Promise<TRoleRequest>;
   updateRole: (payloads: TRoleRequest) => Promise<TRoleRequest>;
@@ -63,18 +71,19 @@ export class AuthService implements IAuthService {
       const role = await this.roleRepository.findOneByName(payloads.role);
       if (!role) throw appError.notFound(resMessage.roleIsNotFound);
 
-      const user = await this.userRepository.findOneByEmail(payloads.email);
-      if (user && user.roles.find((r) => r.name == payloads.role))
-        throw appError.conflict(resMessage.userIsRegistered);
-
       if (role.registration.approvement) {
         if (!role.registration.whitelist.includes(payloads.email))
           throw appError.unauthorized(resMessage.restrictedRole);
+
         role.registration.whitelist = role.registration.whitelist.filter(
           (w) => w !== payloads.email
         );
         await this.roleRepository.updateRegistration(role);
       }
+
+      const user = await this.userRepository.findOneByEmail(payloads.email);
+      if (user && user.roles.find((r) => r.name == payloads.role))
+        throw appError.conflict(resMessage.userIsRegistered);
 
       const hashedPassword = await this.hasher.hashPassword(payloads.additions.password);
       payloads.additions.password = hashedPassword;
@@ -128,7 +137,7 @@ export class AuthService implements IAuthService {
     }
   }
 
-  async resendMailToken(email: string): Promise<string> {
+  async resendMailToken(email: string): Promise<{ max_date: string; token: string }> {
     try {
       const user = await this.userRepository.findOneByEmail(email);
       if (!user) throw appError.notFound(resMessage.userIsNotFound);
@@ -144,7 +153,10 @@ export class AuthService implements IAuthService {
         token: verify_email_token,
       });
 
-      return new Date(new Date().getTime() + this.config.verifyMailPause).toISOString();
+      return {
+        max_date: new Date(new Date().getTime() + this.config.verifyMailPause).toISOString(),
+        token: verify_email_token,
+      };
     } catch (error) {
       if (error instanceof appError.AppError) throw error;
       throw appError.internalServer(error as Error);
@@ -177,7 +189,7 @@ export class AuthService implements IAuthService {
     }
   }
 
-  async refreshToken(refreshToken: string): Promise<TJwt> {
+  async refreshToken(refreshToken: string | undefined): Promise<TJwt> {
     try {
       if (!refreshToken) throw appError.forbidden(resMessage.noRefreshToken);
       const user = await this.jwtProvider.verify(refreshToken);
@@ -200,7 +212,7 @@ export class AuthService implements IAuthService {
         payloads.password,
         currentRole.additions.get("password")
       );
-      if (!validPassword) throw appError.unauthorized(resMessage.wrongPassword);
+      if (!validPassword) throw appError.forbidden(resMessage.wrongPassword);
     } catch (error) {
       if (error instanceof appError.AppError) throw error;
       throw appError.internalServer(error as Error);
@@ -210,7 +222,7 @@ export class AuthService implements IAuthService {
   private async setPassword(payloads: TLoginRequest): Promise<TUserRole[]> {
     const user = await this.userRepository.findOneByEmail(payloads.email);
     const currentRole = (user as TUser).roles.find((r) => r.name == payloads.role);
-    if (!currentRole) throw appError.notFound(resMessage.invalidRole);
+    if (!currentRole) throw appError.forbidden(resMessage.invalidRole);
 
     const hashedPassword = await this.hasher.hashPassword(payloads.password);
     return (user as TUser).roles.map((r) => {
@@ -225,14 +237,16 @@ export class AuthService implements IAuthService {
   async changePassword(payloads: TLoginRequest): Promise<void> {
     try {
       const newRoles = await this.setPassword(payloads);
-      await this.userRepository.updatePassword(payloads.email, newRoles);
+      await this.userRepository.updateAdditions(payloads.email, newRoles);
     } catch (error) {
       if (error instanceof appError.AppError) throw error;
       throw appError.internalServer(error as Error);
     }
   }
 
-  async mailForgotPassword(payloads: TForgotPasswordRequest): Promise<string> {
+  async mailForgotPassword(
+    payloads: TForgotPasswordRequest
+  ): Promise<{ max_date: string; token: string }> {
     try {
       const lastToken = await this.userRepository.findOneResetToken({ ...payloads, token: null });
       if (
@@ -259,7 +273,10 @@ export class AuthService implements IAuthService {
       });
 
       await this.userRepository.createOneResetToken({ ...payloads, token });
-      return new Date(new Date().getTime() + this.config.forgotPassPause).toISOString();
+      return {
+        max_date: new Date(new Date().getTime() + this.config.forgotPassPause).toISOString(),
+        token,
+      };
     } catch (error) {
       if (error instanceof appError.AppError) throw error;
       throw appError.internalServer(error as Error);
@@ -273,7 +290,7 @@ export class AuthService implements IAuthService {
       if (!tokenData) throw appError.unauthorized(resMessage.invalidToken);
 
       const newRoles = await this.setPassword(payloads);
-      await this.userRepository.updatePassword(token.email, newRoles);
+      await this.userRepository.updateAdditions(token.email, newRoles);
       await this.userRepository.deleteResetToken(token.email, token.role);
     } catch (error) {
       if (error instanceof appError.AppError) throw error;
@@ -281,7 +298,7 @@ export class AuthService implements IAuthService {
     }
   }
 
-  private async cleanRole(payloads: TRoleRequest): Promise<TRoleRequest> {
+  private cleanRole(payloads: TRoleRequest): TRoleRequest {
     try {
       const limits: TRole["limits"] = [];
       const limitSet = new Set<string>();
@@ -304,7 +321,7 @@ export class AuthService implements IAuthService {
       const existRole = await this.roleRepository.findOneByName(payloads.name);
       if (existRole) throw appError.conflict(resMessage.roleIsExist);
 
-      const cleanRole = await this.cleanRole(payloads);
+      const cleanRole = this.cleanRole(payloads);
       await this.roleRepository.updateOne(cleanRole);
       return cleanRole;
     } catch (error) {
@@ -318,7 +335,7 @@ export class AuthService implements IAuthService {
       const existRole = await this.roleRepository.findOneByName(payloads.name);
       if (!existRole) throw appError.notFound(resMessage.roleIsNotFound);
 
-      const cleanRole = await this.cleanRole(payloads);
+      const cleanRole = this.cleanRole(payloads);
       await this.roleRepository.updateOne(cleanRole);
       return cleanRole;
     } catch (error) {
@@ -327,7 +344,7 @@ export class AuthService implements IAuthService {
     }
   }
 
-  private async cleanRoute(payloads: TRouteRequest): Promise<TRouteRequest> {
+  private cleanRoute(payloads: TRouteRequest): TRouteRequest {
     try {
       const restrictions: TRoute["restrictions"] = [];
       const restrictSet = new Set();
@@ -349,7 +366,7 @@ export class AuthService implements IAuthService {
       const existRoute = await this.routeRepository.findOneByName(payloads.name);
       if (existRoute) throw appError.conflict(resMessage.serverRouteIsExist);
 
-      const cleanRoute = await this.cleanRoute(payloads);
+      const cleanRoute = this.cleanRoute(payloads);
       await this.routeRepository.updateOne(cleanRoute);
       return cleanRoute;
     } catch (error) {
@@ -363,7 +380,7 @@ export class AuthService implements IAuthService {
       const existRoute = await this.routeRepository.findOneByName(payloads.name);
       if (!existRoute) throw appError.notFound(resMessage.serverRouteIsNotFound);
 
-      const cleanRoute = await this.cleanRoute(payloads);
+      const cleanRoute = this.cleanRoute(payloads);
       await this.routeRepository.updateOne(cleanRoute);
       return cleanRoute;
     } catch (error) {
