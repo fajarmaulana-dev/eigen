@@ -79,12 +79,12 @@ export class Routes {
     r.router.post("/forgot-password", r.ve.forgotPassword, r.authHandler.mailForgotPassword);
     r.router.patch("/reset-password", r.ve.resetPassword, r.authHandler.resetPassword);
     r.router.post("/logout", r.authHandler.logout);
-    // r.router.post("/role", r.ve.role, r.authHandler.addRole);
+    // r.router.post("/role", r.ve.role, r.authHandler.addRole); // uncomment on first setup to create admin role with your email in whitelist
 
     r.router.use(r.authenticator.verify);
     r.router.post("/verify-password", r.ve.verifyPassword, r.authHandler.verifyPassword);
     r.router.patch("/change-password", r.ve.changePassword, r.authHandler.changePassword);
-    r.router.post("/role", r.ve.role, r.authHandler.addRole);
+    r.router.post("/role", r.ve.role, r.authHandler.addRole); // uncomment after you create the admin role
     r.router.patch("/role", r.ve.role, r.authHandler.updateRole);
     r.router.post("/route", r.ve.route, r.authHandler.addRoute);
     r.router.patch("/route", r.ve.route, r.authHandler.updateRoute);
