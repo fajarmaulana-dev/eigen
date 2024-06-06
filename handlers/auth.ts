@@ -142,7 +142,7 @@ export class AuthHandler {
     try {
       const data = await this.authService.mailForgotPassword(req.body);
       const response = {
-        message: resMessage.successRegister,
+        message: resMessage.successSendResetPassAccess,
         data: { max_date: data.max_date, role: req.body.role } as ResRoleToken,
       };
       if (this.env !== cEnv.release) response.data.token = data.token;

@@ -41,7 +41,7 @@ export class BookHandler {
   updateBook = async (req: Request<TBook>, res: Response, next: NextFunction) => {
     try {
       await this.bookService.updateBook(req.body);
-      res.status(resCode.Created).json({
+      res.status(resCode.OK).json({
         message: resMessage.successUpdateBook,
         data: req.body,
       });
